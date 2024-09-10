@@ -23,7 +23,11 @@
 {{- if .Values.webserver.enabled }}
 {{- if or .Values.ingress.web.enabled .Values.ingress.enabled }}
 {{- $fullname := (include "airflow.fullname" .) }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion }}
 apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: networking.k8s.io/v1beta1
+{{- end }}
 kind: Ingress
 metadata:
   name: {{ $fullname }}-ingress
@@ -67,6 +71,7 @@ spec:
         {{- .Values.ingress.web.hosts | default (list .Values.ingress.web.host) | toYaml | nindent 8 }}
       secretName: {{ .Values.ingress.web.tls.secretName }}
   {{- end }}
+  {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion }}
   rules:
     {{- range .Values.ingress.web.hosts | default (list .Values.ingress.web.host) }}
     - http:
@@ -106,6 +111,41 @@ spec:
       host: {{ tpl $hostname $ | quote }}
       {{- end }}
     {{- end }}
+  {{- else}}
+  rules:
+    {{- range .Values.ingress.web.hosts | default (list .Values.ingress.web.host) }}
+    - http:
+        paths:
+          {{- range $.Values.ingress.web.precedingPaths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              serviceName: {{ .serviceName }}
+              servicePort: {{ .servicePort }}
+          {{- end }}
+          - backend:
+              serviceName: {{ $fullname }}-webserver
+              servicePort: airflow-ui
+            {{- if $.Values.ingress.web.path }}
+            path: {{ $.Values.ingress.web.path }}
+            pathType: {{ $.Values.ingress.web.pathType }}
+            {{- end }}
+          {{- range $.Values.ingress.web.succeedingPaths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              serviceName: {{ .serviceName }}
+              servicePort: {{ .servicePort }}
+          {{- end }}
+      {{- $hostname := . -}}
+      {{- if . | kindIs "string" | not }}
+      {{- $hostname = .name -}}
+      {{- end }}
+      {{- if $hostname }}
+      host: {{ tpl $hostname $ | quote }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
   {{- if .Values.ingress.web.ingressClassName }}
   ingressClassName: {{ .Values.ingress.web.ingressClassName }}
   {{- end }}

@@ -20,7 +20,6 @@
 ################################
 ## Airflow Worker Service
 #################################
-{{- if or (eq .Values.executor "CeleryExecutor") (eq .Values.executor "CeleryKubernetesExecutor") }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -40,9 +39,3 @@ spec:
     tier: airflow
     component: worker
     release: {{ .Release.Name }}
-  ports:
-    - name: worker-logs
-      protocol: TCP
-      port: {{ .Values.ports.workerLogs }}
-      targetPort: {{ .Values.ports.workerLogs }}
-{{- end }}

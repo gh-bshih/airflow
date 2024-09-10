@@ -65,10 +65,10 @@ containerLifecycleHooks: {}
 airflowHome: /opt/airflow
 
 # Default airflow repository -- overridden by all the specific images below
-defaultAirflowRepository: apache/airflow
+defaultAirflowRepository: docker.artifactory01.ghdna.io/clinical_data_warehouse
 
 # Default airflow tag to deploy
-defaultAirflowTag: "2.9.3"
+defaultAirflowTag: "devel_bshih_aws_cdw_48"
 
 # Default airflow digest. If specified, it takes precedence over tag
 defaultAirflowDigest: ~
@@ -144,10 +144,16 @@ ingress:
   # Configs for the Ingress of the web Service
   web:
     # Enable web ingress resource
-    enabled: false
+    enabled: true
 
     # Annotations for the web Ingress
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "2400"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "2400"
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
 
     # The path for the web Ingress
     path: "/"
@@ -156,7 +162,7 @@ ingress:
     pathType: "ImplementationSpecific"
 
     # The hostname for the web Ingress (Deprecated - renamed to `ingress.web.hosts`)
-    host: ""
+    host: "bshih-test-airflow-ui.k8s-test.bi.ghdna.io"
 
     # The hostnames or hosts configuration for the web Ingress
     hosts: []
@@ -175,9 +181,9 @@ ingress:
     # configs for web Ingress TLS (Deprecated - renamed to `ingress.web.hosts[*].tls`)
     tls:
       # Enable TLS termination for the web Ingress
-      enabled: false
+      enabled: true
       # the name of a pre-created Secret containing a TLS private key and certificate
-      secretName: ""
+      secretName: "k8s-test.ghdna.io-certs"
 
     # HTTP paths to add to the web Ingress before the default path
     precedingPaths: []
@@ -264,7 +270,7 @@ rbac:
 
 # Airflow executor
 # One of: LocalExecutor, LocalKubernetesExecutor, CeleryExecutor, KubernetesExecutor, CeleryKubernetesExecutor
-executor: "CeleryExecutor"
+executor: "KubernetesExecutor"
 
 # If this is true and using LocalExecutor/KubernetesExecutor/CeleryKubernetesExecutor, the scheduler's
 # service account will have access to communicate with the api-server and launch pods.
@@ -273,7 +279,11 @@ executor: "CeleryExecutor"
 allowPodLaunching: true
 
 # Environment variables for all airflow containers
-env: []
+env:
+  - name: "AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS"
+    value: "false"
+  - name: "AIRFLOW_CONN_TEST_SPARK"
+    value: '{"conn_type": "spark", "host": "spark://bshih-test-spark-master-svc.test.svc.cluster.local", "port": 7077, "extra": {"deploy-mode": "client", "spark_binary": "spark-submit"}}'
 # - name: ""
 #   value: ""
 
@@ -327,7 +337,10 @@ priorityClasses: []
 #    * key (can be templated) is the name of the secret that will be created
 #    * value: an object with the standard 'data' or 'stringData' key (or both).
 #          The value associated with those keys must be a string (can be templated)
-extraSecrets: {}
+extraSecrets:
+  airflow-ssh-secret:
+    data: |
+      gitSshKey: 'LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTnphQzFyWlhrdGRqRUFBQUFBQkc1dmJtVUFBQUFFYm05dVpRQUFBQUFBQUFBQkFBQUNGd0FBQUFkemMyZ3RjbgpOaEFBQUFBd0VBQVFBQUFnRUF1S1FXRDBWWUgwT2RBOVpFNmJPMEk1UHlPRjBPUTR5MC8rWHVjeGZCa0lLUmlrQnlmblM4CmF0UlNPVGNpNmJqekI1UFpvcXU0b1U2T1h1cHhURVRjd0kvUms4TWtQZVNjV3E2MW1KZWVlWDhQQWQ0K3VpbnUvclZZQTAKcDM5SXgwR09PUGJnaHNXVWU1UE1Qck1qdkwyZEFmLzlKbTVMQkswQUJIdlNmV1hsb1VzQVFiVmNrb1ZZL0VBN0g4WnloaQpaWStNY1poNXFqVE9lVWttSE5BWkRnVnFpbGNNQnh0R3lHK05tM2UrYXhDa0Q0R3poSm5KSUcxZEtGV1VPeXY5ajFLaS9NCi9wMTZtK0NXbDF0anIvbVd3eGJnMWFVL0Z2YmNmb2VHZGhWS0ZtMFYzUEJ2YTVKTlo0YWxpSEFxRmtzcnZsWVAxdGtWWXQKVFNiaGk2Mm43bVZvRk5GTXNNZ1FRSHhUVFBYOUpyU2w5Qlk4ZWZLNEVURTU1bEVDSjlCa09NRDFKaEc1bTFnc1ZzMWZkcQpLdWpXS2J6VzhBVzJIa3VHN2dWYndnY0tUV2tIc1FmQzNwMFZYZFR3TFdGM3RxSW52QUNhbU5wb2FGeko5a2NSbndxNi9JCjVmTEdCTXZQSElBeTBmY1lpbjgvN2VuUERjazhPUzZVdStxK1FFQ3BkQ3FBOWdrYVdueFpPbXVST1VmZDl2VlZZb0RJV0gKNDRPM0JsbTVOK0tKa09tQjE3NjdLMnEyYkdEL29rYklHeGE3djV0c1NiYldiVjByQ3kyRnMrQXc0MjVnWjQvSmx3eGJlMgpJSHRRU25WRnF5bTk3V1NMU2RFT1RRRG5RK3h2WUg5UWUyRVdtZkdjd0JPRzVwM1NXQkIyQ09aazk2akUwQXhTL1FnVStICmNBQUFkUXk4Q2lLY3ZBb2lrQUFBQUhjM05vTFhKellRQUFBZ0VBdUtRV0QwVllIME9kQTlaRTZiTzBJNVB5T0YwT1E0eTAKLytYdWN4ZkJrSUtSaWtCeWZuUzhhdFJTT1RjaTZianpCNVBab3F1NG9VNk9YdXB4VEVUY3dJL1JrOE1rUGVTY1dxNjFtSgplZWVYOFBBZDQrdWludS9yVllBMHAzOUl4MEdPT1BiZ2hzV1VlNVBNUHJNanZMMmRBZi85Sm01TEJLMEFCSHZTZldYbG9VCnNBUWJWY2tvVlkvRUE3SDhaeWhpWlkrTWNaaDVxalRPZVVrbUhOQVpEZ1ZxaWxjTUJ4dEd5RytObTNlK2F4Q2tENEd6aEoKbkpJRzFkS0ZXVU95djlqMUtpL00vcDE2bStDV2wxdGpyL21Xd3hiZzFhVS9GdmJjZm9lR2RoVktGbTBWM1BCdmE1Sk5aNAphbGlIQXFGa3NydmxZUDF0a1ZZdFRTYmhpNjJuN21Wb0ZORk1zTWdRUUh4VFRQWDlKclNsOUJZOGVmSzRFVEU1NWxFQ0o5CkJrT01EMUpoRzVtMWdzVnMxZmRxS3VqV0tielc4QVcySGt1RzdnVmJ3Z2NLVFdrSHNRZkMzcDBWWGRUd0xXRjN0cUludkEKQ2FtTnBvYUZ6SjlrY1Jud3E2L0k1ZkxHQk12UEhJQXkwZmNZaW44LzdlblBEY2s4T1M2VXUrcStRRUNwZENxQTlna2FXbgp4Wk9tdVJPVWZkOXZWVllvRElXSDQ0TzNCbG01TitLSmtPbUIxNzY3SzJxMmJHRC9va2JJR3hhN3Y1dHNTYmJXYlYwckN5CjJGcytBdzQyNWdaNC9KbHd4YmUySUh0UVNuVkZxeW05N1dTTFNkRU9UUURuUSt4dllIOVFlMkVXbWZHY3dCT0c1cDNTV0IKQjJDT1prOTZqRTBBeFMvUWdVK0hjQUFBQURBUUFCQUFBQ0FGYzRPNnR2Q0ZlTWF1bGJHQ2FGV3Z6TGNFb3J1d2N4dW5aLwpPUXBwR0dpWkpRTDN1cDM5cXR1VC9GdEdybGxWb29mYjBaekVIVzBsWEo5OWc1T1JtKzNpZ2crWXlNL3I0K2Y2UzVJUFhTCjdyVkQxL3JJWG9OUnRnc25pcmZzcW9abGN6ZDVkMHB5bnRkWlU4dnlkMWs3QUtYbk5NQW9yWXRCNVpZNG40L1l5SVpPbFkKcDBqNHd2TFgvTEg2Szg3WEJ0UU80VHJ2MmRrTEpOV3FOalM2SUh1OUZ6ek9MY0pWb2pRZ2JmWVl0SHlDMmR6eFdjbXprNAp5YjNMdW00V1NxUFJhczVJMGo4Y1NNVEZiSjJHOENvNmJuc3RuWHVPbWFUUmJBcmhIaVU5blVmR3MrTXdPSkhLQklKNDJrCnovSHdKMDgrN3ZYSUFTLzhVMTMwbGVxVFY1VzVZa2JFUlF6ZFp6QW5hZnlWcmVKOEhCNFZWYXZMTTdKNVprMlZ4TisvVmkKaUlOMVdzVGNwSGxIeDEyMFdVRVRNVTlFZXMyOFVSR1MwU05LT2o5eUpJc0xMWWVvdzM1SjdTMVArbEpDMHNJelc3ZHdDRgpnWjhhV1B0WjRuQjlJMjZBOTB1RDNGRVMwdDRoYVAvcDJ0RkFFQU1vOUs0Z0JBb2x1bXE4THFPTklWd1hpYXF6S01RSzBiCmJ0RXByNXA2QWVYcGplUzg0Z1Zmc3dQUHcza2V6U2lNTWIvNXVPUnhvR3gya2JmSHR2N3U3eEVVVVdTcElmZkZtN2xDK1QKU29sVXhuYWc4Ym9XWmRkbDJrdTZ3eTRKcGRpQUQ2NUxlN1RlZEs3ckM0R281K1p2ZnhrVU13ZVUwMTIya3A0bVl4clhDcQo0Um1aV1ltYlo4UytUK2ROa2hBQUFCQVFDTGlTbENkamRaTmJ1UnZ1NTJuL2pxQ3cyNFR5bXloSVYrdmM4czFJSnA3SXBzCjI1RWg0VlFUREF1aGlmbUpPYXZmZ2NGNWxjbDJteFVQUW8zNDE2U1kxN3kxeVNWWEkyd3pLdkxaVndLdFRJSkFYcjByTXkKdmRCbFVyUjdoN0NzRUZMb1dIV3pOYUk4a1hRU3RRblkyY0pTOWJPYVV2QmpZTTNiaVErTm1tQmpjODMzNmFseWlieFJQZwpKN0ZSbWtmNmhrMTl2RnNlTk9zUExBNU5Za0ZXVENEZUFKYVpDWFNyRGw1R0wyVkErMm5mNm0xaU9kYWtSRTNnWGNzMTk3CjdOVWcxWHcweHorS2RHWVA1eStTODloOVpjTjlTVFRIYUNCVHJNb2tXTnJEdGd4bUtzSVFGZ1p1WEJwN2lVMjVwYVNnbTQKVDlWMzYxNkZoNHdpbjF0a0FBQUJBUUR0YXpNanJNcXBMUk9LOWxMSUJkTHhGekc0b1ZpRkRnbWxYN2hMcFJoTkxDVDZMTwpDQVR5a2tiWlh3R0EyRVVMeUd6bm1OeGZjNVlCQmhiREFDZ25UUmkxa3U2VUtYUVg4dE1rTmR0NkFUblZKRE5ER24rY2VpCk15b3A3RndBUnRqRjFZTHZPTXZVWnl3bmhIWVpHbnR4dWRzYVE1dXF3Wk1BM2h5cTN1OGN6MHUrTXJ6OHV2L20zaHFlSzMKSngzUUxqZjB2RXlCR1pSVzlOdTJTcjJzK2pUMnBVNnlRTS9Odlp6aWdEd1VHUGNDNytFYWZnVFRqYmdZeW5EWHpPdHZsWgpHVWd5QXA0NVFKK2hDdEFRV3JLVitiSmM1c0k5enVKRlU3STM2NlhGeW1za0Y2aUxxZHFnK3AycmIySERzbCtNOFYwSGNKCkFQQ1d0ekQwd1BmZ0IvQUFBQkFRREhGM1V1VC8zcWRiWHRNYjdiekgyMHBzV0hieGg5aDJKSXY3NDRTQ2p1T1dLSHArUGsKK1JIU0hLQXlxMngvZVd6N0toWk1JMFZmZFFyc3p4eFBSSmRCaUJUbmRJRDNGamF0Sks2MnUra2piVFNGZ3JLMUlxU1BpNgpsMnl6d3ZMa0E2OVVqajFRWnVpSmcxMHpaWnh2NHRIbEV2b29xS2JMMG5DeTRGa0FpTjZBSFFrR3kxT0FQb3Evc3Q5QkxwCk82ckZXeTVDNW4xbmVEdjNtTnlkeXRhWmN0cy85OFRlcmRuU2M1RFFRTDVSV1MyR3Y2dDNQSmFaeStjOVI2aENUVGJNRnUKUG9tbmE0TEhaZWY2T3AveW1XSVpsUzd2YnQ5WXJOL0dxcEFxaEpJWC9CZTh6RkZYVndRNE5TcS9aL0hwYUJVcFZnVGpMMAo4cDlvM3BqYTN3d0pBQUFBR0dKemFHbG9RR2QxWVhKa1lXNTBhR1ZoYkhSb0xtTnZiUUVDCi0tLS0tRU5EIE9QRU5TU0ggUFJJVkFURSBLRVktLS0tLQo='
 # eg:
 # extraSecrets:
 #   '{{ .Release.Name }}-airflow-connections':
@@ -407,12 +420,12 @@ data:
 
   # Otherwise pass connection values in
   metadataConnection:
-    user: postgres
-    pass: postgres
+    user: admin
+    pass: RPUSIy4u6yO26aF
     protocol: postgresql
-    host: ~
+    host: 10.129.1.51
     port: 5432
-    db: postgres
+    db: airflow
     sslmode: disable
   # resultBackendConnection defaults to the same database as metadataConnection
   resultBackendConnection: ~
@@ -434,7 +447,7 @@ fernetKey: ~
 fernetKeySecretName: ~
 
 # Flask secret key for Airflow Webserver: `[webserver] secret_key` in airflow.cfg
-webserverSecretKey: ~
+webserverSecretKey: '826cabc9042d97f141534e3ba83ed4cf'
 webserverSecretKeySecretName: ~
 
 # In order to use kerberos you need to create secret containing the keytab file
@@ -550,7 +563,7 @@ workers:
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
     automountServiceAccountToken: true
     # Specifies whether a ServiceAccount should be created
-    create: true
+    create: false
     # The name of the ServiceAccount to use.
     # If not set and create is true, a name is generated using the release name
     name: ~
@@ -674,7 +687,10 @@ workers:
     #   memory: 128Mi
 
 
-  resources: {}
+  resources:
+    limits:
+      cpu: '8'
+      memory: 20Gi
   #  limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -832,7 +848,7 @@ scheduler:
 
   # Airflow 2.0 allows users to run multiple schedulers,
   # However this feature is only recommended for MySQL 8+ and Postgres
-  replicas: 1
+  replicas: 4
   # Max number of old replicasets to retain
   revisionHistoryLimit: ~
 
@@ -869,7 +885,7 @@ scheduler:
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
     automountServiceAccountToken: true
     # Specifies whether a ServiceAccount should be created
-    create: true
+    create: false
     # The name of the ServiceAccount to use.
     # If not set and create is true, a name is generated using the release name
     name: ~
@@ -887,7 +903,10 @@ scheduler:
       maxUnavailable: 1
       # minAvailable: 1
 
-  resources: {}
+  resources:
+    limits:
+      cpu: '8'
+      memory: 20Gi
   #  limits:
   #   cpu: 100m
   #   memory: 128Mi
@@ -1330,7 +1349,7 @@ webserver:
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
     automountServiceAccountToken: true
     # Specifies whether a ServiceAccount should be created
-    create: true
+    create: false
     # The name of the ServiceAccount to use.
     # If not set and create is true, a name is generated using the release name
     name: ~
@@ -1376,7 +1395,10 @@ webserver:
       ports:
         - port: "{{ .Values.ports.airflowUI }}"
 
-  resources: {}
+  resources:
+    limits:
+      cpu: '4'
+      memory: 4Gi
   #   limits:
   #     cpu: 100m
   #     memory: 128Mi
@@ -1418,7 +1440,40 @@ webserver:
   # as a custom webserver_config.py. You can bake a webserver_config.py in to
   # your image instead or specify a configmap containing the
   # webserver_config.py.
-  webserverConfig: ~
+  webserverConfig: |
+    import os
+    from flask_appbuilder.security.manager import AUTH_OAUTH
+    from airflow.configuration import conf
+
+    basedir = os.path.abspath(os.path.dirname(__file__))
+
+    AUTH_TYPE = AUTH_OAUTH
+    AUTH_USER_REGISTRATION = True
+    AUTH_USER_REGISTRATION_ROLE = "Viewer"
+    CSRF_ENABLED = True
+
+    # The SQLAlchemy connection string.
+    SQLALCHEMY_DATABASE_URI = conf.get('database', 'SQL_ALCHEMY_CONN')
+
+    OAUTH_PROVIDERS = [
+      {
+        "name": "google",
+        "icon": "fa-google",
+        "token_key": "access_token",
+        "whitelist": ["@guardanthealth.com"],
+        "remote_app": {
+          "client_id": "1050627600989-9l28k8tgnlfh6ibr0s0v5o0ob0kmeicp.apps.googleusercontent.com",
+          "client_secret": "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",
+          "api_base_url": "https://www.googleapis.com/oauth2/v2/",
+          "client_kwargs": {
+            "scope": "email profile"
+            },
+          "request_token_url": None,
+          "access_token_url": "https://accounts.google.com/o/oauth2/token",
+          "authorize_url": "https://accounts.google.com/o/oauth2/auth"
+        },
+      },
+    ]
   # webserverConfig: |
   #   from airflow import configuration as conf
 
@@ -1495,7 +1550,7 @@ webserver:
 
 # Airflow Triggerer Config
 triggerer:
-  enabled: true
+  enabled: false
   # Number of airflow triggerers in the deployment
   replicas: 1
   # Max number of old replicasets to retain
@@ -1982,7 +2037,7 @@ statsd:
   # Add custom annotations to the statsd configmap
   configMapAnnotations: {}
 
-  enabled: true
+  enabled: false
   # Max number of old replicasets to retain
   revisionHistoryLimit: ~
 
@@ -2336,7 +2391,7 @@ redis:
 # Auth secret for a private registry
 # This is used if pulling airflow images from a private registry
 registry:
-  secretName: ~
+  secretName: "artifactory-regcred"
 
   # Example:
   # connection:
@@ -2384,7 +2439,7 @@ limits: []
 
 # This runs as a CronJob to cleanup old pods.
 cleanup:
-  enabled: false
+  enabled: true
   # Run every 15 minutes (templated).
   schedule: "*/15 * * * *"
   # To select a random-ish, deterministic starting minute between 3 and 12 inclusive for each release:
@@ -2426,7 +2481,7 @@ cleanup:
     # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
     automountServiceAccountToken: true
     # Specifies whether a ServiceAccount should be created
-    create: true
+    create: false
     # The name of the ServiceAccount to use.
     # If not set and create is true, a name is generated using the release name
     name: ~
@@ -2450,13 +2505,13 @@ cleanup:
 
   # Specify history limit
   # When set, overwrite the default k8s number of successful and failed CronJob executions that are saved.
-  failedJobsHistoryLimit: ~
-  successfulJobsHistoryLimit: ~
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 1
 
 # Configuration for postgresql subchart
 # Not recommended for production
 postgresql:
-  enabled: true
+  enabled: false
   auth:
     enablePostgresUser: true
     postgresPassword: postgres
@@ -2592,22 +2647,25 @@ dags:
     ## optional subpath for dag volume mount
     subPath: ~
   gitSync:
-    enabled: false
+    enabled: true
 
     # git repo clone url
     # ssh example: git@github.com:apache/airflow.git
     # https example: https://github.com/apache/airflow.git
-    repo: https://github.com/apache/airflow.git
-    branch: v2-2-stable
+    repo: git@github.com:guardant/clinical_data_warehouse.git
+    branch: "devel/bshih/aws_cdw"
     rev: HEAD
     # The git revision (branch, tag, or hash) to check out, v4 only
-    ref: v2-2-stable
+    ref: "devel/bshih/aws_cdw"
     depth: 1
     # the number of consecutive failures allowed before aborting
     maxFailures: 0
     # subpath within the repo where dags are located
     # should be "" if dags are at repo root
-    subPath: "tests/dags"
+    subPath: "src/clinical_data_warehouse/airflow/dags"
+    sshKeySecret: airflow-ssh-secret
+    knownHosts: |
+      github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
     # if your repo needs a user name password
     # you can load them to a k8s secret like the one below
     #   ---
@@ -2675,7 +2733,8 @@ dags:
     #  runAsGroup: 0
 
     securityContexts:
-      container: {}
+      container:
+        allowPrivilegeEscalation: false
 
     # container level lifecycle hooks
     containerLifecycleHooks: {}
