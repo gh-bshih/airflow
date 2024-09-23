@@ -1,0 +1,34 @@
+{{- range .Values.ghdsVolumes }}
+{{- if $.Values.static_provisioning }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    name: {{ $.Release.Name }}-{{ .name }}-pv
+    helm.sh/chart: "{{ $.Chart.Name }}-{{ $.Chart.Version }}"
+    app.kubernetes.io/name: "{{ $.Chart.Name }}"
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/version: {{ $.Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+  name: {{ $.Release.Name }}-{{ .name }}-pv
+spec:
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: {{ $.Release.Namespace }}
+    name: {{ $.Release.Name }}-{{ .name }}-pvc
+  {{- if .persistence.storageClass }}
+  storageClassName: {{ .persistence.storageClass }}
+  {{- else }}
+  storageClassName: ""
+  {{- end }}
+  capacity:
+    storage: {{ .persistence.size }}
+  accessModes:
+    - {{ .persistence.accessMode }}
+  csi:
+    driver: spectrumscale.csi.ibm.com
+    volumeHandle: {{ .persistence.volumeHandleID }};path={{ .persistence.gpfsMountPath }}
+{{- end }}
+{{- end }}

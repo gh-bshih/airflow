@@ -68,7 +68,7 @@ airflowHome: /opt/airflow
 defaultAirflowRepository: docker.artifactory01.ghdna.io/clinical_data_warehouse
 
 # Default airflow tag to deploy
-defaultAirflowTag: "devel_bshih_aws_cdw_48"
+defaultAirflowTag: "devel_bshih_aws_cdw_52"
 
 # Default airflow digest. If specified, it takes precedence over tag
 defaultAirflowDigest: ~
@@ -289,6 +289,22 @@ env:
 
 # Volumes for all airflow containers
 volumes: []
+
+static_provisioning: true
+
+ghdsVolumes:
+- name: warehouse
+  containerMountPath: /ghds/datawarehouse/data_platform
+  persistence:
+    enabled: true
+    existingClaim:
+      enabled: false
+      claimName: ''
+    storageClass: "ghsfa-ibm-spectrum-scale-csi-fileset"
+    accessMode: ReadOnlyMany
+    size: 10Gi
+    gpfsMountPath: "/ghds/datawarehouse/data_platform"
+    volumeHandleID: 14050783556819073858;0A140133:601B024C
 
 # VolumeMounts for all airflow containers
 volumeMounts: []
@@ -757,7 +773,17 @@ workers:
   # annotations for the worker resource
   annotations: {}
 
-  podAnnotations: {}
+  podAnnotations:
+    vault.hashicorp.com/preserve-secret-case: "true"
+    vault.hashicorp.com/role: bi-dev
+    vault.hashicorp.com/tls-secret: vault-cacert
+    vault.hashicorp.com/ca-cert: /vault/tls/cacert.pem
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/agent-init-first: "true"
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/agent-inject-default-template: "json"
+    vault.hashicorp.com/agent-inject-secret-environment: secret/bi-dev/mars
+    vault.hashicorp.com/agent-inject-file-environment: "environment.json"
 
   # Labels specific to workers objects and pods
   labels: {}
@@ -790,7 +816,11 @@ workers:
     securityContexts:
       container: {}
 
-  env: []
+  env:
+    - name: "AIRFLOW__SECRETS__BACKEND"
+      value: "airflow.secrets.local_filesystem.LocalFilesystemBackend"
+    - name: "AIRFLOW__SECRETS__BACKEND_KWARGS"
+      value: '{"variables_file_path": "/vault/secrets/environment.json"}'
 
   volumeClaimTemplates: []
   # Additional volumeClaimTemplates needed.
@@ -848,7 +878,7 @@ scheduler:
 
   # Airflow 2.0 allows users to run multiple schedulers,
   # However this feature is only recommended for MySQL 8+ and Postgres
-  replicas: 4
+  replicas: 2
   # Max number of old replicasets to retain
   revisionHistoryLimit: ~
 
@@ -2537,6 +2567,7 @@ config:
     # For Airflow 1.10, backward compatibility; moved to [logging] in 2.0
     colored_console_log: 'False'
     remote_logging: '{{- ternary "True" "False" .Values.elasticsearch.enabled }}'
+    min_serialized_dag_update_interval: 86400
   logging:
     remote_logging: '{{- ternary "True" "False" .Values.elasticsearch.enabled }}'
     colored_console_log: 'False'

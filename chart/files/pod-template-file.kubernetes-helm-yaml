@@ -113,6 +113,11 @@ spec:
       {{- end }}
       resources: {{- toYaml .Values.workers.resources | nindent 8 }}
       volumeMounts:
+        {{- range .Values.ghdsVolumes }}
+        - name: {{ .name }}-volume
+          mountPath: {{ .containerMountPath }}
+          {{ if eq .persistence.accessMode "ReadOnlyMany" }}readOnly: true {{ end }}
+        {{- end }}
         - mountPath: {{ template "airflow_logs" . }}
           name: logs
         {{- include "airflow_config_mount" . | nindent 8 }}
@@ -209,6 +214,25 @@ spec:
   topologySpreadConstraints: {{- toYaml $topologySpreadConstraints | nindent 4 }}
   serviceAccountName: {{ include "worker.serviceAccountName" . }}
   volumes:
+{{- if .Values.ghdsVolumes }}
+{{- range .Values.ghdsVolumes }}
+  - name: {{ .name }}-volume
+    {{- if and .persistence.enabled  (not .persistence.existingClaim.enabled) }}
+    persistentVolumeClaim:
+      claimName: {{ $.Release.Name }}-{{ .name }}-pvc
+      {{ if eq .persistence.accessMode "ReadOnlyMany" }}readOnly: true {{ end }}
+    {{- else if and .persistence.enabled .persistence.existingClaim.enabled }}
+    persistentVolumeClaim:
+    {{- if (not (empty .persistence.existingClaim.claimName)) }}
+      claimName: {{ .persistence.existingClaim.claimName }}
+    {{- else }}
+      claimName: {{ $.Release.Name }}-{{ .name }}-pvc
+    {{- end }}
+    {{- else}}
+    emptyDir: {}
+    {{- end }}
+{{- end }}
+{{- end }}
   {{- if .Values.dags.persistence.enabled }}
   - name: dags
     persistentVolumeClaim:

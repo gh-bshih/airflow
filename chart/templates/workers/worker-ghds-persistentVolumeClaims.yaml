@@ -1,0 +1,32 @@
+{{- range .Values.ghdsVolumes }}
+{{- if and .persistence.enabled (not .persistence.existingClaim.enabled) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-{{ .name }}-pvc
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    helm.sh/chart: "{{ $.Chart.Name }}-{{ $.Chart.Version }}"
+    app.kubernetes.io/name: "{{ $.Chart.Name }}"
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/version: {{ $.Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+  {{- if .persistence.storageClass }}
+  storageClassName: {{ .persistence.storageClass }}
+  {{- else }}
+  storageClassName: ""
+  {{- end }}
+  accessModes:
+    - {{ .persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .persistence.size }}
+  {{- if $.Values.static_provisioning }}
+  selector:
+    matchLabels:
+      name: {{ $.Release.Name }}-{{ .name }}-pv
+  {{- end }}
+{{- end }}
+{{- end }}
